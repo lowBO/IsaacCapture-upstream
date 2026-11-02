@@ -86,10 +86,10 @@ For every glove sample the plugin passes the SDK angles to `rh_hand_points` for
 the glove's model and uses its 27 points: 21 joint child links, five fingertips
 and the palm_link origin, in the `{hand}_tracker_link` frame. Positions are meters
 and rotations are row-major 3x3 matrices; the SDK writes NaN for every quantity
-an invalid angle affects. The plugin re-expresses the points from palm_link (the
-tracker origin becomes PALM, palm_link becomes WRIST), takes the SDK fingertips
-as given and applies the reviewed OpenXR mapping below. It computes no FK of its
-own.
+an invalid angle affects. The plugin expresses the points relative to the corrected
+WRIST origin: tracker_link supplies PALM, and palm_link supplies WRIST after its
+depth correction. It takes the SDK fingertips as given and applies the reviewed
+OpenXR mapping below. It computes no FK of its own.
 
 The SDK's P model has its own link positions and fingertips. The corrections
 fitted on DV1 have been reviewed for P and apply to it unchanged. A P1 glove has
@@ -151,6 +151,16 @@ meters, orientation is normalized XYZW, and all 26 output poses are relative to
 WRIST. OpenXR position/orientation validity follows each point independently;
 actual tracking flags require a usable wrist source.
 
+The four-finger PROXIMAL positions are not locked to the corrected MPR pivots.
+With a locked pivot, MCP flexion still changes their orientations toward PIP,
+but their positions stay fixed and the PROXIMAL-to-PIP distances can change.
+That full motion differs from the mechanical MCP links carrying the SDK taxels.
+The current mapping carries both position and orientation with MCP to retain
+the existing rigid tactile bindings. Consequently PROXIMAL can move away from
+the corrected MPR pivot during flexion; this is a mechanical fitting choice,
+not a wearer-validated anatomical MCP location. Locking those positions would
+require a separate tactile binding design.
+
 Valid points carry separate position and orientation flags, and a partially
 valid hand keeps them per point. Point radii are nominal visualization values.
 
@@ -186,22 +196,20 @@ tracked wrist the hand is still injected, without TRACKED flags, at the last val
 wrist pose or at the stage origin if there is none, and the `/hand` status is
 degraded. Glove stalls remove the hand; the next glove sample restores it.
 
-The plugin adds the OpenXR wrist-axis convention: model `palm_link` is WRIST;
-model `tracker_link` supplies PALM with its reviewed height correction. The
-origin of `palm_link` is a reference point of the glove's mechanical model on
-the back of the hand, near the end of the forearm, and the same point for both
-models. It is not the anatomical wrist centre that OpenXR's WRIST stands for.
-Nominally the wrist centre is about 4 cm further towards the fingers and about
-1.5 to 2 cm towards the palm; these figures come from typical adult hand
-dimensions, not from measurements on the glove, and vary with the wearer. The
-plugin places the glove's WRIST at the host WRIST without correcting for this
-offset. When the host wrist comes from optical hand tracking, it is the
-anatomical wrist, so the injected hand sits that much further towards the
-fingers and the palm than the tracked hand. With a controller, set
-`--aim-to-wrist-left` and `--aim-to-wrist-right` to end at the `palm_link`
-origin. All 26 poses are relative to WRIST, so consumers that need the
-anatomical wrist, for example to attach a forearm, must apply their own offset.
-Verify the alignment before using the output for control.
+The WRIST origin is the SDK's `palm_link` origin shifted 12.59782883756545 mm
+along palm_link +X, from the exoskeleton toward the palm. This is the neutral
+PALM/middle/ring proximal depth plane of the reviewed DV1 geometry; the tilted
+thumb anchor is excluded. Both products and both hands use the same depth.
+The WRIST orientation stays unchanged. Every hand point and the SDK taxel layout
+is re-expressed relative to this corrected origin, so WRIST remains at zero and
+finger lengths and relative orientations are preserved. The SDK's raw points
+and the other points' fitting parameters are unchanged.
+
+This depth correction is a model fit, not a measured anatomical wrist
+calibration, and adds no shift along the fingers. For a controller, set
+`--aim-to-wrist-left` and `--aim-to-wrist-right` to end at the corrected WRIST,
+rather than the uncorrected `palm_link` origin. Verify the wearer-specific
+alignment before using the output for control.
 
 ## Tests
 

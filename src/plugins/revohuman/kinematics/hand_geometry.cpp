@@ -216,6 +216,7 @@ void assemble(RhHand hand,
                                                  shift->amount));
         }
     }
+    // A tactile carrier must share its SDK link's full motion, not just its rotation.
     // A non-thumb proximal point is placed, pad correction included, in the frame of the MPR link (the anchor),
     // but the finger bends about the MCP origin 19.5 mm further out (22.5 mm from the corrected point). Carry it
     // with the MCP flexion so that it is rigid on the MCP link, like the PIP point it aims at: the bone keeps its
@@ -247,7 +248,8 @@ void assemble(RhHand hand,
     for (int i = 0; i < 26; ++i)
     {
         bool mapped = i != 6 && i != 11 && i != 16 && i != 21;
-        write_point(result[i], mv(inv, points[i]), mul(inv, frames[i]), mapped);
+        // WRIST is the relocated landmark; express every point relative to it, including the placeholders.
+        write_point(result[i], mv(inv, sub(points[i], points[1])), mul(inv, frames[i]), mapped);
     }
     std::copy(std::begin(result), std::end(result), out);
 }
@@ -275,7 +277,12 @@ RhStatus wrist_from_sdk_points(RhHand hand, const LinkPose sdk[27], LinkPose* wr
     M palm_rotation{};
     std::copy_n(sdk[26].r, 9, palm_rotation.begin());
     const M rotation = mul(palm_rotation, model(hand).wrist);
-    std::copy_n(sdk[26].p, 3, wrist->p);
+    V origin{};
+    std::copy_n(sdk[26].p, 3, origin.begin());
+    // WRIST corrections are fixed in palm_link; never drive them from a finger. Share this origin with taxels.
+    for (const Height* shift : { &model(hand).correction[1].lateral, &model(hand).correction[1].pad })
+        origin = add(origin, mv(palm_rotation, scale(shift->inward, shift->amount)));
+    std::copy(origin.begin(), origin.end(), wrist->p);
     std::copy(rotation.begin(), rotation.end(), wrist->r);
     return RH_OK;
 }

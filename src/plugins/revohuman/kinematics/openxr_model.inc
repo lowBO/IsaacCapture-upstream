@@ -7,7 +7,7 @@
 // takes the same corrections: a lateral shift then leaves its bones at most 3.3 um off rigid. The plugin refuses
 // an SDK whose models differ from kReviewedModels; changing the corrections or the rules that apply them needs a
 // new kMappingId.
-constexpr const char* kMappingId = "reviewed-openxr-symmetric-v3";
+constexpr const char* kMappingId = "reviewed-openxr-symmetric-v6";
 struct ReviewedModel
 {
     const char* name; // rh_hand_model_info name
@@ -17,6 +17,8 @@ constexpr ReviewedModel kReviewedModels[] = {
     { "dv1", "9e343e1f1ffccee7bf8dbfcd24bf05b085ff400668c9bc3b071fd174b7d55592" },
     { "p", "b400ebf2df5abcbf1d8c88fd66ded8ec73cd5c35bb62cf28c92eb153e007edc2" },
 };
+// WRIST moves along palm_link +X to the neutral PALM/middle/ring proximal plane, not the tilted thumb plane.
+constexpr double kWristPadM = 0.01259782883756545;
 constexpr double kPlaceholder[4][3] = {
     { .018, .003, -.055 }, { .005, .002, -.055 }, { -.008, .003, -.055 }, { -.022, .005, -.05 }
 };
@@ -24,7 +26,7 @@ const Model kModel0 = {
     { -4.336808689942018e-19, -0.9996343707598901, 0.027039319434451838, -0.9959269287673426, 0.0024379740461849446,
       0.090131064781233, -0.09016403138751444, -0.026929186360312732, -0.9955627887611725 },
     { { { -1, { 0, 0, 0 }, 0 }, { -1, { 1, 0, 0 }, 0.018274150003565453 } },
-      { { -1, { 0, 0, 0 }, 0 }, { -1, { 0, 0, 0 }, 0 } },
+      { { -1, { 0, 0, 0 }, 0 }, { -1, { 1, 0, 0 }, kWristPadM } },
       { { -1, { 0, 0, 0 }, 0 }, { 19, { 1, 0, 0 }, 0.014553057085492309 } },
       { { 19, { 0.0047418328189518235, 0.9850609625533788, 0.1721406839620662 }, 0.01180176096585353 },
         { -1, { 0, 0, 0 }, 0 } },
@@ -69,7 +71,7 @@ const Model kModel1 = {
     { 4.336808689942018e-19, -0.9996343707598901, 0.027039319434451838, -0.9959269287673426, -0.0024379740461849446,
       -0.090131064781233, 0.09016403138751444, -0.026929186360312732, -0.9955627887611725 },
     { { { -1, { 0, 0, 0 }, 0 }, { -1, { 1, 0, 0 }, 0.018274150003565453 } },
-      { { -1, { 0, 0, 0 }, 0 }, { -1, { 0, 0, 0 }, 0 } },
+      { { -1, { 0, 0, 0 }, 0 }, { -1, { 1, 0, 0 }, kWristPadM } },
       { { -1, { 0, 0, 0 }, 0 }, { 19, { 1, 0, 0 }, 0.014553057085492309 } },
       { { 19, { -0.0047418328189518235, 0.9850609625533788, -0.1721406839620662 }, -0.01180176096585353 },
         { -1, { 0, 0, 0 }, 0 } },

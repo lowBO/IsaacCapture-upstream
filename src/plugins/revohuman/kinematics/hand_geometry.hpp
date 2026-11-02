@@ -39,12 +39,12 @@ constexpr std::uint32_t kSdkPointsVersion = 1u;
 
 // SDK hand point set (rh_hand_points, points version 1) in its own order and {hand}_tracker_link frame:
 // 21 joint child links, five TIPs (index, middle, ring, little, thumb) and the palm_link origin. TIPs are
-// taken as given; the tracker_link origin becomes PALM and palm_link becomes WRIST. Invalid quantities must
-// be NaN, as the SDK writes them.
+// taken as given; the tracker_link origin supplies PALM and the corrected palm_link origin supplies WRIST. Invalid
+// quantities must be NaN, as the SDK writes them.
 RhStatus hand_points_from_sdk_points(RhHand hand, const LinkPose points[kSdkPointCount], HandPoint out[kHandPointCount]);
 
 // WRIST in the {hand}_tracker_link frame of an SDK point set: the frame the OpenXR points above are written
-// in, palm_link (point 26) turned by the reviewed WRIST rotation.
+// in, palm_link (point 26) shifted toward the palm and turned by the reviewed WRIST rotation.
 RhStatus wrist_from_sdk_points(RhHand hand, const LinkPose points[kSdkPointCount], LinkPose* wrist);
 
 // The OpenXR point that moves with SDK link @p link (rh_hand_model_fk order): DIP and PIP links carry the

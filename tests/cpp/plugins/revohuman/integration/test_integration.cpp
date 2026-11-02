@@ -53,7 +53,7 @@ Vec3 delta(const Vec3& a, const Vec3& b)
 TEST_CASE("reviewed hand tips follow each DIP for both hands", "[revohuman][geometry]")
 {
     const auto provider = make_hand_kinematics(HandModel::Dv1);
-    CHECK(provider->model_id().rfind("sdk-points:dv1:reviewed-openxr-symmetric-v3-", 0) == 0);
+    CHECK(provider->model_id().rfind("sdk-points:dv1:reviewed-openxr-symmetric-v6-", 0) == 0);
     for (const auto hand : { Hand::Left, Hand::Right })
     {
         std::array<double, kGloveJointCount> angles{};
@@ -112,6 +112,29 @@ TEST_CASE("reviewed hand tips follow each DIP for both hands", "[revohuman][geom
     }
 }
 
+TEST_CASE("the corrected WRIST lies on the neutral palm plane for both products", "[revohuman][geometry]")
+{
+    // Palm-link +X toward the skin, expressed in the reviewed OpenXR WRIST basis.
+    const Vec3 inward{ 0, -.9996343707598901, .027039319434451838 };
+    for (const auto model : { HandModel::Dv1, HandModel::P })
+    {
+        const auto provider = make_hand_kinematics(model);
+        for (const auto hand : { Hand::Left, Hand::Right })
+        {
+            const auto solved = provider->solve(hand, {}, kAllAngles);
+            REQUIRE(solved);
+            CHECK(norm(solved->joints[1].p) < 1e-12);
+            CHECK(std::abs(solved->joints[1].q[0]) < 1e-12);
+            CHECK(std::abs(solved->joints[1].q[1]) < 1e-12);
+            CHECK(std::abs(solved->joints[1].q[2]) < 1e-12);
+            CHECK(solved->joints[1].q[3] == Approx(1).margin(1e-12));
+            CHECK(std::abs(dot(solved->joints[0].p, inward)) < 1e-12);
+            for (const int proximal : { 12, 17 })
+                CHECK(std::abs(dot(solved->joints[proximal].p, inward)) < .000501);
+        }
+    }
+}
+
 TEST_CASE("a non-thumb proximal joint is rigid on the MCP link", "[revohuman][geometry]")
 {
     // The bone to the intermediate joint keeps its length and turns by the encoder angle. P takes the
@@ -151,12 +174,43 @@ TEST_CASE("a non-thumb proximal joint is rigid on the MCP link", "[revohuman][ge
     }
 }
 
+TEST_CASE("hand fitting remains mirrored between left and right", "[revohuman][geometry]")
+{
+    for (const auto model : { HandModel::Dv1, HandModel::P })
+    {
+        const auto provider = make_hand_kinematics(model);
+        for (const double bend : { 0., .35, .7 })
+        {
+            std::array<double, kGloveJointCount> angles{};
+            angles.fill(bend);
+            const auto left = provider->solve(Hand::Left, angles, kAllAngles);
+            const auto right = provider->solve(Hand::Right, angles, kAllAngles);
+            REQUIRE(left);
+            REQUIRE(right);
+            CHECK(left->position_valid_mask == right->position_valid_mask);
+            CHECK(left->orientation_valid_mask == right->orientation_valid_mask);
+            for (std::size_t j = 0; j < kHandJointCount; ++j)
+            {
+                CAPTURE(provider->model_id(), bend, j);
+                const auto& l = left->joints[j];
+                const auto& r = right->joints[j];
+                CHECK(norm(delta({ -l.p[0], l.p[1], l.p[2] }, r.p)) < 1e-12);
+                const Quat mirrored{ l.q[0], -l.q[1], -l.q[2], l.q[3] };
+                double qdot = 0;
+                for (std::size_t k = 0; k < 4; ++k)
+                    qdot += mirrored[k] * r.q[k];
+                CHECK(std::abs(qdot) == Approx(1).margin(1e-12));
+            }
+        }
+    }
+}
+
 TEST_CASE("hand model P has poses but no taxels", "[revohuman][geometry]")
 {
     // P1 gloves have no tactile sensors, so the SDK has no taxel layout for their hand model.
     const auto provider = make_hand_kinematics(HandModel::P);
     CHECK(provider->model_id() ==
-          "sdk-points:p:reviewed-openxr-symmetric-v3-b400ebf2df5abcbf1d8c88fd66ded8ec73cd5c35bb62cf28c92eb153e007edc2");
+          "sdk-points:p:reviewed-openxr-symmetric-v6-b400ebf2df5abcbf1d8c88fd66ded8ec73cd5c35bb62cf28c92eb153e007edc2");
     for (const auto hand : { Hand::Left, Hand::Right })
     {
         CAPTURE(hand_name(hand));
@@ -285,8 +339,7 @@ TEST_CASE("the TactileMetadata comes from the SDK taxel layout and matches it at
 
 TEST_CASE("the SDK taxels are the layout on rh_hand_model_fk, in the WRIST frame", "[revohuman][tactile][geometry]")
 {
-    // Against the SDK's palm-frame FK directly. WRIST shares palm_link's origin and is only turned from
-    // it, so lengths, inner products and handedness must agree.
+    // Compare in the corrected WRIST origin before checking rotation-invariant lengths and inner products.
     std::array<double, kGloveJointCount> angles{};
     for (std::size_t i = 0; i < angles.size(); ++i)
         angles[i] = .3 + .02 * static_cast<double>(i);
@@ -314,6 +367,7 @@ TEST_CASE("the SDK taxels are the layout on rh_hand_model_fk, in the WRIST frame
                     n[r] += l.r[3 * r + c] * t.n[c];
                 }
             }
+            p[0] -= .01259782883756545; // Reviewed wrist depth in palm_link coordinates.
             palm_p.push_back(p);
             palm_n.push_back(n);
         }

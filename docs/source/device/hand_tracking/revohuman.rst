@@ -169,15 +169,14 @@ Position values are in meters and quaternion values use ``(x, y, z, w)``.
 Without a tracked wrist the hand is still injected, without tracking flags, at
 the last valid wrist pose (or the stage origin), and its status is degraded.
 
-The glove's wrist is a reference point of its mechanical model on the back of
-the hand, near the end of the forearm, not the anatomical wrist centre that the
-OpenXR wrist joint stands for, and the plugin does not correct for the
-difference. Nominally the wrist centre is about 4 cm further towards the fingers
-and about 1.5 to 2 cm towards the palm; these figures come from typical adult
-hand dimensions, not from measurements on the glove, and vary with the wearer.
-With optical hand tracking, the injected hand therefore sits that much further
-towards the fingers and the palm than the tracked hand. With a controller, set
-the aim-to-wrist offsets to end at the glove's wrist point.
+The glove's WRIST is based on the SDK's ``palm_link`` origin, shifted
+12.59782883756545 mm toward the palm along palm_link +X. This places it at the
+neutral PALM/middle/ring proximal depth plane, using the same value for both
+products and both hands. The plugin expresses all hand points and tactile
+geometry relative to this corrected origin; WRIST itself remains at zero.
+This is a model fit, not an anatomical wrist calibration, and adds no shift
+along the fingers. For a controller, set the aim-to-wrist offsets to end at
+this corrected WRIST. Verify the alignment for the wearer.
 
 Tactile layout
 --------------
